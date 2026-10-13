@@ -5,15 +5,14 @@ from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-# 1. Configuration (Set these via Render Environment Variables)
-COMPANY_ID = os.environ.get("COMPANY_ID", "YOUR_COMPANY_ID")
-ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN", "YOUR_ACCESS_TOKEN")
+# Pull values directly from Render Environment variables
+COMPANY_ID = os.environ.get("COMPANY_ID", "").strip()
+ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
 
-# Correct Base URL (Change to "https://intuit.com" for production)
-BASE_URL = "https://intuit.com"
+# Clean QuickBooks base URL (No paths or trailing slashes)
+BASE_URL = "https://sandbox-quickbooks.api.intuit.com"
 
-# 2. In-Memory Cache variables to prevent 429 Rate Limiting
-CACHE_DURATION = 300  # Cache data for 5 minutes (300 seconds)
+CACHE_DURATION = 300  
 customer_cache = None
 last_fetch_time = 0
 
@@ -21,23 +20,30 @@ last_fetch_time = 0
 def get_customers():
     global customer_cache, last_fetch_time
     
+    if not COMPANY_ID or not ACCESS_TOKEN:
+        return jsonify({
+            "error": "Configuration Missing",
+            "details": "COMPANY_ID or ACCESS_TOKEN environment variable is not populated on Render."
+        }), 500
+        
     current_time = time.time()
-    
-    # Check if we have a valid, recent cache of the customer data
     if customer_cache and (current_time - last_fetch_time < CACHE_DURATION):
-        print("Returning customer list from local cache...")
         return jsonify(customer_cache), 200
 
-    print("Cache expired or empty. Fetching fresh data from QuickBooks Online API...")
+    # Header parameters optimized for the QuickBooks query endpoint
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/text"
     }
 
-    query = "SELECT Id, DisplayName FROM Customer"
+    # Absolute standard QuickBooks query endpoint structure
     url = f"{BASE_URL}/v3/company/{COMPANY_ID}/query"
-    params = {"query": query}
+    
+    # Query must be sent as a direct string parameter
+    params = {
+        "query": "SELECT Id, DisplayName FROM Customer"
+    }
 
     try:
         response = requests.get(url, headers=headers, params=params)
@@ -46,22 +52,17 @@ def get_customers():
             data = response.json()
             raw_customers = data.get("QueryResponse", {}).get("Customer", [])
             
-            # Format payload structure cleanly
             customer_list = [{"id": c.get("Id"), "name": c.get("DisplayName")} for c in raw_customers]
             
-            # Update cache and timestamp
             customer_cache = customer_list
             last_fetch_time = current_time
-            
             return jsonify(customer_list), 200
-        
-        elif response.status_code == 429:
-            # If still throttled, return the old cached data if it exists rather than breaking
-            if customer_cache:
-                return jsonify({"warning": "API Throttled. Returning stale data.", "data": customer_cache}), 200
-            return jsonify({"error": "API Throttled (429)", "details": "QuickBooks rate limit exceeded. Please wait a few minutes."}), 429
         else:
-            return jsonify({"error": f"API Error: {response.status_code}", "details": response.text}), 500
+            return jsonify({
+                "error": f"API Error: {response.status_code}", 
+                "details": response.text,
+                "endpoint_attempted": url
+            }), 500
 
     except Exception as e:
         return jsonify({"error": "Connection Failed", "details": str(e)}), 500
