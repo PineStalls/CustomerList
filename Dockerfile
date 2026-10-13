@@ -17,4 +17,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Start the application (Make sure this matches your exact filename)
-CMD ["python", "/app/qbo_service.py"]
+CMD ["python", "/app/customer_service.py"]
