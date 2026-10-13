@@ -14,9 +14,9 @@ CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "").strip()
 ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
 REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "").strip()
 
-# Configuration Settings
-BASE_URL = "https://intuit.com"  # Change to "https://intuit.com" for production
-TOKEN_URL = "https://intuit.com"
+# Absolute QuickBooks Online API URLs (Fixed Typo)
+BASE_URL = "https://sandbox-quickbooks.api.intuit.com"  # Use https://quickbooks.api.intuit.com for production
+TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 
 # In-Memory Cache Variables
 CACHE_DURATION = 300  # 5 minutes
@@ -109,7 +109,7 @@ def get_customers():
     result = fetch_from_quickbooks()
     if result["status"] == "success":
         return jsonify(result["data"]), 200
-    return jsonify({"error": f"QBO API Error {result.get('code')}", "details": result.get("text")}), 500
+    return jsonify({"error": f"QBO API Error {result.get('code')}", "details": result.get('text')}), 500
 
 @app.route("/jotform-customers", methods=["GET"])
 def get_jotform_customers():
