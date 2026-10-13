@@ -1,20 +1,20 @@
-# Use an official lightweight Python runtime
+# Use a standard Python runtime
 FROM python:3.11-slim
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the requirements file first to leverage Docker caching
+# Copy requirements first to speed up builds
 COPY requirements.txt .
 
-# Install the required Python packages
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your web service code
-COPY . .
+# Copy EVERY file from your local directory into the container's /app directory
+COPY . /app/
 
-# Expose the port your web service runs on (Render expects a web service)
+# Expose port for Render
 EXPOSE 8000
 
-# Run your python script (replace qbo_service.py with your exact script name)
-CMD ["python", "qbo_service.py"]
+# Start the application (Make sure this matches your exact filename)
+CMD ["python", "/app/qbo_service.py"]
