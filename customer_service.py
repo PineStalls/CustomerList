@@ -1,37 +1,43 @@
 import json
-from quickbooks import QuickBooks
-from quickbooks.objects.customer import Customer
-from intuitlib.client import AuthClient
+import requests
 
-# 1. Initialize Authentication (replace placeholders with your tokens)
-auth_client = AuthClient(
-    client_id="YOUR_CLIENT_ID",
-    client_secret="YOUR_CLIENT_SECRET",
-    environment="sandbox",
-    redirect_uri="YOUR_REDIRECT_URI",
-)
-auth_client.access_token = "YOUR_ACCESS_TOKEN"
-auth_client.refresh_token = "YOUR_REFRESH_TOKEN"
+# 1. Configuration variables
+COMPANY_ID = "YOUR_COMPANY_ID"
+ACCESS_TOKEN = "YOUR_ACCESS_TOKEN"
+# Use '://intuit.com' for sandbox, '://intuit.com' for production
+BASE_URL = "https://://intuit.com" 
 
-qbo_client = QuickBooks(
-    auth_client=auth_client,
-    refresh_token=auth_client.refresh_token,
-    company_id="YOUR_COMPANY_ID",
-)
+# 2. Set up API headers
+headers = {
+    "Authorization": f"Bearer {ACCESS_TOKEN}",
+    "Accept": "application/json",
+    "Content-Type": "text/plain"
+}
 
-# 2. Fetch Customers
-customers = Customer.all(qb=qbo_client)
+# 3. Define the QBO SQL-like query to select customers
+query = "SELECT Id, DisplayName FROM Customer"
+url = f"{BASE_URL}/v3/company/{COMPANY_ID}/query?query={query}"
 
-# 3. Parse into a list of dictionaries
-customer_list = []
-for customer in customers:
-    customer_list.append({
-        "id": customer.Id,
-        "name": customer.DisplayName
-    })
+try:
+    # 4. Make the API request
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        data = response.json()
+        
+        # Extract customers from the QueryResponse
+        raw_customers = data.get("QueryResponse", {}).get("Customer", [])
+        
+        # Format the JSON cleanly
+        customer_list = [{"id": c.get("Id"), "name": c.get("DisplayName")} for c in raw_customers]
+        
+        # Save to file
+        with open("qbo_customers.json", "w", encoding="utf-8") as file:
+            json.dump(customer_list, file, indent=4)
+            
+        print("Successfully saved customer list to qbo_customers.json")
+    else:
+        print(f"API Error: Status {response.status_code} - {response.text}")
 
-# 4. Convert the list to a JSON string
-json_output = json.dumps(customer_list, indent=4)
-
-# Print the final JSON payload
-print(json_output)
+except Exception as e:
+    print(f"An error occurred: {e}")
